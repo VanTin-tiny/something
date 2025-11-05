@@ -2,13 +2,15 @@
 import { useRegistration } from "@/providers/RegistrationProvider";
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
+import OceanWavesBackground from "@/components/OceanWavesBackground";
 
 export default function RegistrantsList() {
     const { registrants } = useRegistration();
     const router = useRouter();
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 p-8">
+        <div className="min-h-screen p-8 ">
+            <OceanWavesBackground />
             <button onClick={() => router.push("/")} className="flex items-center text-purple-600 hover:underline mb-6">
                 <ArrowLeft className="w-5 h-5 mr-1" /> Quay lại
             </button>
@@ -17,21 +19,20 @@ export default function RegistrantsList() {
                 <table className="w-full table-auto border-collapse">
                     <thead>
                         <tr className="bg-purple-100 text-left">
-                            <th className="px-4 py-2">#</th>
                             <th className="px-4 py-2">Họ và tên</th>
-                            <th className="px-4 py-2">Email</th>
+                            <th className="px-4 py-2">Địa chỉ</th>
                             <th className="px-4 py-2">Ngày đăng ký</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {registrants.map((r) => (
-                            <tr key={r.id} className="border-t hover:bg-purple-50">
-                                <td className="px-4 py-2">{r.id}</td>
+                        {registrants.map((r, index) => (
+                            <tr key={`${r.name}-${index}`} className="border-t hover:bg-purple-50">
                                 <td className="px-4 py-2">{r.name}</td>
-                                <td className="px-4 py-2">{r.email}</td>
+                                <td className="px-4 py-2">{r.diaChi}</td>
                                 <td className="px-4 py-2">{r.registeredAt}</td>
                             </tr>
                         ))}
+
                     </tbody>
                 </table>
             </div>
