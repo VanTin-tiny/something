@@ -4,12 +4,13 @@ import React, { createContext, useContext, useState } from "react";
 interface FormData {
     name: string;
     email: string;
+    sdt: string;
+    diaChi: string;
 }
 
 interface Registrant {
-    id: number;
     name: string;
-    email: string;
+    diaChi: string;
     registeredAt: string;
 }
 
@@ -23,18 +24,22 @@ interface RegistrationContextProps {
 const RegistrationContext = createContext<RegistrationContextProps | null>(null);
 
 export const RegistrationProvider = ({ children }: { children: React.ReactNode }) => {
-    const [formData, setFormData] = useState<FormData>({ name: "", email: "" });
+    const [formData, setFormData] = useState<FormData>({ name: "", email: "", sdt: "", diaChi: "" });
     const [registrants, setRegistrants] = useState<Registrant[]>([
-        { id: 1, name: "Nguyễn Văn A", email: "vana@email.com", registeredAt: "2024-10-15" },
-        { id: 2, name: "Trần Thị B", email: "thib@email.com", registeredAt: "2024-10-16" },
-        { id: 3, name: "Lê Hoàng C", email: "hoangc@email.com", registeredAt: "2024-10-18" },
+        { name: "Võ Văn Tín", diaChi: "Quang Nam", registeredAt: "2024-10-15" },
+        { name: "Nguyễn Trung Kiên", diaChi: "Quảng Nam", registeredAt: "2024-10-16" },
+        { name: "Nguyễn Lương Thiện", diaChi: "Quảng Nam", registeredAt: "2024-10-18" },
+        { name: "Lê Nhật Triều", diaChi: "Quảng Nam", registeredAt: "2024-10-18" },
+        { name: "Lê Đức Bảo", diaChi: "Quảng Nam", registeredAt: "2024-10-18" },
+
     ]);
 
     const addRegistrant = (data: FormData) => {
         const newRegistrant = {
-            id: registrants.length + 1,
             name: data.name,
             email: data.email,
+            sdt: data.sdt,
+            diaChi: data.diaChi,
             registeredAt: new Date().toISOString().split("T")[0],
         };
         setRegistrants([...registrants, newRegistrant]);
