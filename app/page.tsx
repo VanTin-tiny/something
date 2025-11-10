@@ -1,232 +1,379 @@
-"use client";
-import Navbar from "@/components/Navbar";
-import { Calendar, MapPin } from "lucide-react";
-import Link from "next/link";
+'use client'
+import React, { useEffect, useRef, useState } from 'react';
+import * as THREE from 'three';
 
-export default function HomePage() {
+const ThreeJsTextReveal = () => {
+  const mountRef = useRef<HTMLDivElement>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const textMeshesRef = useRef<THREE.Mesh[]>([]);
+
+  const words = ['Đời', 'là', 'bể', 'khổ'];
+  const colors = [0xff6b6b, 0x4ecdc4, 0xffe66d, 0x95e1d3];
+
+  useEffect(() => {
+    const currentMount = mountRef.current;
+    if (!currentMount) return;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1a2e);
+    sceneRef.current = scene;
+
+    const camera = new THREE.PerspectiveCamera(
+      75,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      1000
+    );
+    camera.position.z = 15;
+    cameraRef.current = camera;
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    currentMount.appendChild(renderer.domElement);
+    rendererRef.current = renderer;
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+
+    const pointLight1 = new THREE.PointLight(0xffffff, 2);
+    pointLight1.position.set(10, 10, 10);
+    scene.add(pointLight1);
+
+    const pointLight2 = new THREE.PointLight(0xff00ff, 1.5);
+    pointLight2.position.set(-10, -10, 5);
+    scene.add(pointLight2);
+
+    const pointLight3 = new THREE.PointLight(0x00ffff, 1.5);
+    pointLight3.position.set(0, 10, -5);
+    scene.add(pointLight3);
+
+    const particlesGeometry = new THREE.BufferGeometry();
+    const particlesCount = 1000;
+    const posArray = new Float32Array(particlesCount * 3);
+
+    for (let i = 0; i < particlesCount * 3; i++) {
+      posArray[i] = (Math.random() - 0.5) * 50;
+    }
+
+    particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+    const particlesMaterial = new THREE.PointsMaterial({
+      size: 0.05,
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.6
+    });
+
+    const particlesMesh = new THREE.Points(particlesGeometry, particlesMaterial);
+    scene.add(particlesMesh);
+
+    let animationId: number;
+    const animate = () => {
+      animationId = requestAnimationFrame(animate);
+
+      particlesMesh.rotation.y += 0.001;
+      particlesMesh.rotation.x += 0.0005;
+
+      textMeshesRef.current.forEach((mesh, index) => {
+        if (mesh) {
+          mesh.rotation.y += 0.01;
+          mesh.rotation.x = Math.sin(Date.now() * 0.001 + index) * 0.1;
+          mesh.position.y += Math.sin(Date.now() * 0.001 + index) * 0.002;
+
+          const glow = mesh.children[0];
+          if (glow && glow instanceof THREE.Mesh) {
+            glow.material.opacity = 0.3 + Math.sin(Date.now() * 0.002 + index) * 0.2;
+          }
+        }
+      });
+
+      renderer.render(scene, camera);
+    };
+    animate();
+
+    const handleResize = () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    };
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      cancelAnimationFrame(animationId);
+      if (currentMount && renderer.domElement) {
+        currentMount.removeChild(renderer.domElement);
+      }
+      renderer.dispose();
+    };
+  }, []);
+
+  const createTextMesh = (text: string, position: { x: number; y: number; z: number }, color: number) => {
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    if (!context) return null;
+
+    canvas.width = 512;
+    canvas.height = 256;
+
+    context.shadowColor = 'rgba(0, 0, 0, 0.8)';
+    context.shadowBlur = 30;
+    context.shadowOffsetX = 5;
+    context.shadowOffsetY = 5;
+
+    const gradient = context.createLinearGradient(0, 0, 512, 256);
+    gradient.addColorStop(0, `#${color.toString(16).padStart(6, '0')}`);
+    gradient.addColorStop(0.5, '#ffffff');
+    gradient.addColorStop(1, `#${color.toString(16).padStart(6, '0')}`);
+
+    context.fillStyle = gradient;
+    context.font = 'Bold 180px Arial';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+
+    context.strokeStyle = '#000000';
+    context.lineWidth = 8;
+    context.strokeText(text, 256, 128);
+    context.fillText(text, 256, 128);
+
+    const texture = new THREE.CanvasTexture(canvas);
+
+    const geometry = new THREE.BoxGeometry(8, 4, 0.5);
+
+    const materials = [
+      new THREE.MeshStandardMaterial({ color: color, metalness: 0.3, roughness: 0.4 }), // right
+      new THREE.MeshStandardMaterial({ color: color, metalness: 0.3, roughness: 0.4 }), // left
+      new THREE.MeshStandardMaterial({ color: color, metalness: 0.3, roughness: 0.4 }), // top
+      new THREE.MeshStandardMaterial({ color: color, metalness: 0.3, roughness: 0.4 }), // bottom
+      new THREE.MeshStandardMaterial({ map: texture, transparent: true, emissive: color, emissiveIntensity: 0.3 }), // front
+      new THREE.MeshStandardMaterial({ map: texture, transparent: true, emissive: color, emissiveIntensity: 0.3 }), // back
+    ];
+
+    const mesh = new THREE.Mesh(geometry, materials);
+    mesh.position.set(position.x, position.y, position.z);
+    mesh.scale.set(0, 0, 0);
+
+    const glowGeometry = new THREE.PlaneGeometry(9, 5);
+    const glowMaterial = new THREE.MeshBasicMaterial({
+      color: color,
+      transparent: true,
+      opacity: 0.3,
+      side: THREE.DoubleSide
+    });
+    const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+    glow.position.z = -0.3;
+    mesh.add(glow);
+
+    return mesh;
+  };
+
+  const handleClick = () => {
+    if (currentIndex >= words.length || isAnimating) return;
+
+    setIsAnimating(true);
+    const scene = sceneRef.current;
+    if (!scene) return;
+
+    const word = words[currentIndex];
+    const color = colors[currentIndex];
+
+    const spacing = 9;
+    const totalWidth = (words.length - 1) * spacing;
+    const startX = -totalWidth / 2;
+    const x = startX + currentIndex * spacing;
+    const y = 0;
+    const z = 0;
+
+    const textMesh = createTextMesh(word, { x, y, z }, color);
+    if (!textMesh) return;
+
+    scene.add(textMesh);
+    textMeshesRef.current[currentIndex] = textMesh;
+
+    const startTime = Date.now();
+    const duration = 1000;
+
+    const animateEntrance = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+
+      const bounceScale = progress < 0.5
+        ? 4 * progress * progress * progress
+        : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
+      textMesh.scale.set(bounceScale, bounceScale, bounceScale);
+
+      textMesh.rotation.z = (1 - progress) * Math.PI * 4;
+      textMesh.position.z = (1 - progress) * 10;
+
+      if (progress < 1) {
+        requestAnimationFrame(animateEntrance);
+      } else {
+        setIsAnimating(false);
+        setCurrentIndex(currentIndex + 1);
+      }
+    };
+
+    animateEntrance();
+  };
+
+  const handleReset = () => {
+    textMeshesRef.current.forEach(mesh => {
+      if (mesh && sceneRef.current) {
+        sceneRef.current.remove(mesh);
+        mesh.geometry.dispose();
+
+        if (Array.isArray(mesh.material)) {
+          mesh.material.forEach(mat => mat.dispose());
+        } else {
+          mesh.material.dispose();
+        }
+
+        if (mesh.children.length > 0) {
+          const glow = mesh.children[0];
+          if (glow instanceof THREE.Mesh) {
+            glow.geometry.dispose();
+            if (Array.isArray(glow.material)) {
+              glow.material.forEach(mat => mat.dispose());
+            } else {
+              glow.material.dispose();
+            }
+          }
+        }
+      }
+    });
+    textMeshesRef.current = [];
+    setCurrentIndex(0);
+    setIsAnimating(false);
+  };
+
   return (
-    <div>
-      <main
-        className="relative min-h-screen flex flex-col items-center justify-center text-center bg-cover bg-center bg-no-repeat overflow-hidden"
-        style={{
-          backgroundImage:
-            "url('https://moc247.com/wp-content/uploads/2023/12/hinh-anh-bien-dep_1-2048x1366.jpg')",
-        }}
-      >
-        {/* Overlay */}
-        <div className="absolute inset-0 bg-white/60 backdrop-blur-sm -z-10"></div>
+    <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', position: 'relative' }}>
+      <div ref={mountRef} style={{ width: '100%', height: '100%' }} />
 
-        {/* Animated Elements */}
-        <div className="absolute inset-0 pointer-events-none">
-          {/* Sun */}
-          <div className="absolute top-12 right-20 w-20 h-20 rounded-full bg-gradient-radial from-[#FFE5B4] to-[#FFD98E] shadow-[0_0_40px_rgba(255,229,180,0.6)] animate-pulse-slow" />
-
-          {/* Clouds */}
-          <div className="absolute top-20 -left-24 w-24 h-10 bg-white/85 rounded-full animate-cloud-float">
-            <div className="absolute -top-6 left-2 w-12 h-12 bg-white/85 rounded-full" />
-            <div className="absolute -top-5 right-2 w-14 h-10 bg-white/85 rounded-full" />
-          </div>
-          <div className="absolute top-36 -left-36 w-28 h-11 bg-white/85 rounded-full animate-cloud-float-slow">
-            <div className="absolute -top-7 left-3 w-14 h-14 bg-white/85 rounded-full" />
-            <div className="absolute -top-6 right-3 w-16 h-11 bg-white/85 rounded-full" />
-          </div>
-
-          {/* Palm Trees */}
-          <svg className="absolute top-0 left-0 w-32 h-48 opacity-80" viewBox="0 0 100 150">
-            <rect x="45" y="80" width="10" height="70" fill="#8B4513" />
-            <path d="M50 80 Q20 60 10 50 Q30 55 50 60" fill="#2D5016" />
-            <path d="M50 80 Q80 60 90 50 Q70 55 50 60" fill="#2D5016" />
-            <path d="M50 75 Q35 50 30 35 Q45 45 50 55" fill="#3A6B35" />
-            <path d="M50 75 Q65 50 70 35 Q55 45 50 55" fill="#3A6B35" />
-          </svg>
-
-          <svg className="absolute top-0 right-0 w-40 h-56 opacity-80" viewBox="0 0 100 150">
-            <rect x="45" y="80" width="10" height="70" fill="#8B4513" />
-            <path d="M50 80 Q20 60 10 50 Q30 55 50 60" fill="#2D5016" />
-            <path d="M50 80 Q80 60 90 50 Q70 55 50 60" fill="#2D5016" />
-            <path d="M50 75 Q35 50 30 35 Q45 45 50 55" fill="#3A6B35" />
-            <path d="M50 75 Q65 50 70 35 Q55 45 50 55" fill="#3A6B35" />
-          </svg>
-
-          {/* Animated People */}
-          <div className="absolute top-[55%] -left-16 animate-walk-beach">
-            <svg viewBox="0 0 24 24" className="w-12 h-12 drop-shadow-lg" fill="#FF6B6B">
-              <circle cx="12" cy="5" r="3" />
-              <path d="M12 9c-2 0-3.5 1-3.5 2.5V14l-2 8h3l1.5-6 1.5 6h3l-2-8v-2.5C15.5 10 14 9 12 9z" />
-            </svg>
-          </div>
-
-          <div className="absolute top-[58%] -left-16 animate-walk-beach-slow">
-            <svg viewBox="0 0 24 24" className="w-12 h-12 drop-shadow-lg" fill="#4ECDC4">
-              <circle cx="12" cy="5" r="3" />
-              <path d="M12 9c-2 0-3.5 1-3.5 2.5V14l-2 8h3l1.5-6 1.5 6h3l-2-8v-2.5C15.5 10 14 9 12 9z" />
-            </svg>
-          </div>
-
-          <div className="absolute top-[62%] -left-16 animate-walk-beach-slower">
-            <svg viewBox="0 0 24 24" className="w-12 h-12 drop-shadow-lg" fill="#FFE66D">
-              <circle cx="12" cy="5" r="3" />
-              <path d="M12 9c-2 0-3.5 1-3.5 2.5V14l-2 8h3l1.5-6 1.5 6h3l-2-8v-2.5C15.5 10 14 9 12 9z" />
-            </svg>
-          </div>
-
-          {/* Surfer */}
-          <div className="absolute top-[68%] -left-24 animate-surf">
-            <svg width="80" height="60" viewBox="0 0 80 60" className="drop-shadow-lg">
-              <ellipse cx="40" cy="45" rx="35" ry="8" fill="#26B5A8" opacity="0.6" />
-              <rect x="10" y="40" width="60" height="4" rx="2" fill="#FF6B6B" />
-              <circle cx="40" cy="25" r="6" fill="#FFE66D" />
-              <path d="M40 32c-4 0-7 2-7 5v5l7 10 7-10v-5c0-3-3-5-7-5z" fill="#4ECDC4" />
-            </svg>
-          </div>
-
-          {/* Beach Umbrellas */}
-          <svg className="absolute bottom-[25%] right-[20%] drop-shadow-lg" width="60" height="80" viewBox="0 0 60 80">
-            <path d="M30 20 Q10 25 10 35 L30 30 L50 35 Q50 25 30 20 Z" fill="#FF6B6B" />
-            <path d="M30 20 Q20 23 15 35" fill="none" stroke="#CC5555" strokeWidth="1" />
-            <path d="M30 20 Q40 23 45 35" fill="none" stroke="#CC5555" strokeWidth="1" />
-            <rect x="28" y="30" width="4" height="45" fill="#8B4513" />
-          </svg>
-
-          <svg className="absolute bottom-[25%] left-[15%] drop-shadow-lg" width="60" height="80" viewBox="0 0 60 80">
-            <path d="M30 20 Q10 25 10 35 L30 30 L50 35 Q50 25 30 20 Z" fill="#4ECDC4" />
-            <path d="M30 20 Q20 23 15 35" fill="none" stroke="#3DAAA3" strokeWidth="1" />
-            <path d="M30 20 Q40 23 45 35" fill="none" stroke="#3DAAA3" strokeWidth="1" />
-            <rect x="28" y="30" width="4" height="45" fill="#8B4513" />
-          </svg>
-
-          {/* Volleyball */}
-          <div className="absolute top-[45%] left-[35%] animate-bounce-ball">
-            <svg width="40" height="40" viewBox="0 0 40 40">
-              <circle cx="20" cy="20" r="18" fill="#FFF" stroke="#000" strokeWidth="2" />
-              <path d="M20 2 Q25 20 20 38" fill="none" stroke="#000" strokeWidth="2" />
-              <path d="M38 20 Q20 15 2 20" fill="none" stroke="#000" strokeWidth="2" />
-              <path d="M35 10 Q25 20 15 30" fill="none" stroke="#000" strokeWidth="2" />
-            </svg>
-          </div>
-
-          {/* Waves */}
-          <div className="absolute bottom-0 w-full h-24 opacity-30">
-            <svg className="absolute bottom-0 w-full h-full animate-wave" viewBox="0 0 1200 100" preserveAspectRatio="none">
-              <path d="M0,50 Q300,0 600,50 T1200,50 L1200,100 L0,100 Z" fill="#26B5A8" />
-            </svg>
-            <svg className="absolute -bottom-2 w-full h-full animate-wave-reverse" viewBox="0 0 1200 100" preserveAspectRatio="none">
-              <path d="M0,70 Q300,20 600,70 T1200,70 L1200,100 L0,100 Z" fill="#1F9B8F" />
-            </svg>
-          </div>
+      <div style={{
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        textAlign: 'center',
+        pointerEvents: 'none',
+        zIndex: currentIndex === 0 ? 10 : -1,
+        opacity: currentIndex === 0 ? 1 : 0,
+        transition: 'opacity 0.5s'
+      }}>
+        <div style={{
+          fontSize: '48px',
+          color: '#fff',
+          fontWeight: 'bold',
+          textShadow: '0 0 20px rgba(255,255,255,0.5)',
+          marginBottom: '20px'
+        }}>
+          Tặng bạn một câu
         </div>
+        <div style={{
+          fontSize: '24px',
+          color: '#4ecdc4',
+          fontStyle: 'italic'
+        }}>
+          Một câu nói đầy triết lý đang chờ bạn...
+        </div>
+      </div>
 
-        <Navbar />
+      <div style={{
+        position: 'absolute',
+        bottom: '40px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        display: 'flex',
+        gap: '20px',
+        zIndex: 10
+      }}>
+        <button
+          onClick={handleClick}
+          disabled={currentIndex >= words.length || isAnimating}
+          style={{
+            padding: '15px 40px',
+            fontSize: '20px',
+            fontWeight: 'bold',
+            background: currentIndex >= words.length
+              ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+              : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+            color: 'white',
+            border: 'none',
+            borderRadius: '50px',
+            cursor: currentIndex >= words.length || isAnimating ? 'not-allowed' : 'pointer',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+            transition: 'all 0.3s',
+            opacity: currentIndex >= words.length || isAnimating ? 0.5 : 1,
+            transform: 'scale(1)',
+          }}
+          onMouseEnter={(e) => {
+            if (currentIndex < words.length && !isAnimating) {
+              (e.target as HTMLButtonElement).style.transform = 'scale(1.1)';
+              (e.target as HTMLButtonElement).style.boxShadow = '0 15px 40px rgba(245,87,108,0.5)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            (e.target as HTMLButtonElement).style.transform = 'scale(1)';
+            (e.target as HTMLButtonElement).style.boxShadow = '0 10px 30px rgba(0,0,0,0.3)';
+          }}
+        >
+          {currentIndex >= words.length ? 'Hoàn thành!' : `Tiếp theo (${currentIndex + 1}/${words.length})`}
+        </button>
 
-        <header className="text-center py-20 relative z-10">
-          <h1 className="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-blue-600">
-            Da Nang Sea Festival 2025
-          </h1>
-          <p className="text-gray-600 mt-4 max-w-2xl mx-auto text-lg">
-            Hòa mình vào không gian sôi động của biển cả, nơi hội tụ âm nhạc, ẩm thực, văn hóa và thể thao biển. Cùng nhau tận hưởng mùa hè rực rỡ và khám phá vẻ đẹp bất tận của Đà Nẵng.
-          </p>
+        {currentIndex > 0 && (
+          <button
+            onClick={handleReset}
+            style={{
+              padding: '15px 40px',
+              fontSize: '20px',
+              fontWeight: 'bold',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '50px',
+              cursor: 'pointer',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+              transition: 'all 0.3s',
+            }}
+            onMouseEnter={(e) => {
+              (e.target as HTMLButtonElement).style.transform = 'scale(1.1)';
+              (e.target as HTMLButtonElement).style.boxShadow = '0 15px 40px rgba(102,126,234,0.5)';
+            }}
+            onMouseLeave={(e) => {
+              (e.target as HTMLButtonElement).style.transform = 'scale(1)';
+              (e.target as HTMLButtonElement).style.boxShadow = '0 10px 30px rgba(0,0,0,0.3)';
+            }}
+          >
+            Làm lại
+          </button>
+        )}
+      </div>
 
-          <div className="flex justify-center gap-4 mt-8">
-            <div className="flex items-center gap-2 text-gray-700">
-              <Calendar className="w-5 h-5 text-purple-500" /> 12-14/12/2025
-            </div>
-            <div className="flex items-center gap-2 text-gray-700">
-              <MapPin className="w-5 h-5 text-purple-500" /> Đà Nẵng
-            </div>
-          </div>
-
-          <div className="mt-10">
-            <Link
-              href="/register"
-              className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-3 rounded-full text-lg font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-200"
-            >
-              Đăng ký ngay
-            </Link>
-          </div>
-        </header>
-      </main>
-      <style jsx>{`
-        @keyframes pulse-slow {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.1); }
-        }
-        @keyframes cloud-float {
-          from { transform: translateX(0); }
-          to { transform: translateX(calc(100vw + 200px)); }
-        }
-        @keyframes cloud-float-slow {
-          from { transform: translateX(0); }
-          to { transform: translateX(calc(100vw + 200px)); }
-        }
-        @keyframes walk-beach {
-          0% { left: -64px; transform: translateY(0); }
-          50% { transform: translateY(-10px); }
-          100% { left: calc(100vw + 64px); transform: translateY(0); }
-        }
-        @keyframes walk-beach-slow {
-          0% { left: -64px; transform: translateY(0); }
-          50% { transform: translateY(-10px); }
-          100% { left: calc(100vw + 64px); transform: translateY(0); }
-        }
-        @keyframes walk-beach-slower {
-          0% { left: -64px; transform: translateY(0); }
-          50% { transform: translateY(-10px); }
-          100% { left: calc(100vw + 64px); transform: translateY(0); }
-        }
-        @keyframes surf {
-          0% { left: -100px; transform: rotate(-5deg); }
-          50% { left: 50%; transform: rotate(5deg); }
-          100% { left: calc(100vw + 100px); transform: rotate(-5deg); }
-        }
-        @keyframes bounce-ball {
-          0%, 100% { transform: translateY(0) rotate(0deg); }
-          50% { transform: translateY(-30px) rotate(180deg); }
-        }
-        @keyframes wave {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-        @keyframes wave-reverse {
-          0% { transform: translateX(-50%); }
-          100% { transform: translateX(0); }
-        }
-        .animate-pulse-slow { animation: pulse-slow 3s ease-in-out infinite; }
-        .animate-cloud-float { animation: cloud-float 20s linear infinite; }
-        .animate-cloud-float-slow { animation: cloud-float-slow 25s linear infinite; animation-delay: -5s; }
-        .animate-walk-beach { animation: walk-beach 18s linear infinite; }
-        .animate-walk-beach-slow { animation: walk-beach-slow 22s linear infinite; animation-delay: -8s; }
-        .animate-walk-beach-slower { animation: walk-beach-slower 20s linear infinite; animation-delay: -15s; }
-        .animate-surf { animation: surf 20s ease-in-out infinite; }
-        .animate-bounce-ball { animation: bounce-ball 2s ease-in-out infinite; }
-        .animate-wave { animation: wave 8s linear infinite; }
-        .animate-wave-reverse { animation: wave-reverse 6s linear infinite; }
-        .animate-fade-in { animation: fadeIn 0.8s ease-out; }
-        .animate-fade-in-delay { animation: fadeIn 1s ease-out 0.3s backwards; }
-        .animate-slide-up { animation: slideUp 0.8s ease-out; }
-        .animate-slide-up-delay { animation: slideUp 0.8s ease-out 0.2s backwards; }
-        .animate-bounce-slow { animation: bounceSlow 2s ease-in-out infinite; }
-        
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes slideUp {
-          from { opacity: 0; transform: translateY(30px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes bounceSlow {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-5px); }
-        }
-      `}</style>
+      <div style={{
+        position: 'absolute',
+        top: '30px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        color: '#fff',
+        fontSize: '18px',
+        fontWeight: 'bold',
+        textShadow: '0 0 10px rgba(0,0,0,0.5)',
+        padding: '10px 30px',
+        background: 'rgba(255,255,255,0.1)',
+        borderRadius: '30px',
+        backdropFilter: 'blur(10px)',
+      }}>
+        {currentIndex === 0 && 'Hành trình bắt đầu...'}
+        {currentIndex > 0 && currentIndex < words.length && `Đang khám phá... (${currentIndex}/${words.length})`}
+        {currentIndex === words.length && 'Chân lý đã được tiết lộ!'}
+      </div>
     </div>
+  );
+};
 
-  )
-}
-
-
-
-
-
-
-
+export default ThreeJsTextReveal;
